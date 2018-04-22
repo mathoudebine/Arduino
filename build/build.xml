@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <project name="Arduino" default="build">
-  <!--echo message="os.name = ${os.name}" /-->
-  <!--echo message="os.arch = ${os.arch}" /-->
-  <!--echo message="os.version = ${os.version}" /-->
+  <echo message="os.name = ${os.name}" />
+  <echo message="os.arch = ${os.arch}" />
+  <echo message="os.version = ${os.version}" />
 
   <tstamp>
     <format property="BUILD_DATE" pattern="yyyy/MM/dd hh:mm"/>
@@ -589,6 +589,10 @@
     </delete>
   </target>
 
+  <target name="pcduino-clean" >
+    <delete dir="shared/examples/00.pcDuino" />
+  </target>
+	
   <target name="linux-checkos" unless="linux">
     <echo>
       =======================================================
@@ -709,6 +713,45 @@
     </antcall>
   </target>
 
+  <target name="pcduino-build" depends="revision-check, linux-checkos, subprojects-build, pcduino-check-avalable" description="Build linux version">
+    <mkdir dir="linux/work" />
+
+    <copy todir="linux/work">
+      <fileset dir="shared" includes="lib/**" />
+      <fileset file="shared/revisions.txt" />
+    </copy>
+
+    <copy todir="linux/work/lib" flatten="true">
+      <fileset refid="runtime.jars" />
+    </copy>
+
+    <antcall target="assemble">
+      <param name="target.path" value="linux/work" />
+    </antcall>
+
+    <copy todir="linux/work" file="linux/dist/arduino" />
+    <chmod perm="755" file="linux/work/arduino" />
+
+    <copy todir="linux/work/hardware">
+      <fileset dir="linux/dist" includes="tools/**" />
+    </copy>
+
+    <chmod perm="755" file="linux/work/hardware/tools/avrdude" />
+    <chmod perm="755" file="linux/work/hardware/tools/bossac" />
+    <chmod perm="755" file="linux/work/hardware/tools/bossac64" />
+    <chmod perm="755" file="linux/work/hardware/tools/adk2tool" />
+    <chmod perm="755" file="linux/work/hardware/tools/adk2install" />
+
+    <copy todir="linux/work" file="linux/dist/arduino" />
+<copy todir="linux/work/lib" file="linux/liblistSerials-1.4.0/arm/liblistSerialsj.so" />
+<copy tofile="linux/work/lib/libastylej.so" file="linux/libastylej-2.05.1/libastylej_arm.so" />
+    <chmod perm="755" file="linux/work/arduino" />
+    <antcall target="pcduino-unzip-source" />
+    <antcall target="pcduino-copy-examples" />
+
+    <antcall target="build-arduino-builder" />
+  </target>
+	
   <target name="linux32-build" depends="linux-libastyle-x86" description="Build linux (32-bit) version">
     <antcall target="linux-jvm-${linux-bundle-jvm-task}">
       <param name="JVM" value="${LINUX32_BUNDLED_JVM}"/>
@@ -759,8 +802,51 @@
 
   <target name="linux32-run" depends="build,start"/>
 
+  <target name="pcduino-run" depends="pcduino-build"
+          description="Run Linux (32-bit) version">
+    <exec executable="./linux/work/arduino" spawn="false"/>
+  </target>
+	
   <target name="linux64-run" depends="build,start"/>
 
+  <target name="pcduino-check-source">
+    <available file="linux/dist/pcduino-arduino.zip" property="pcduino_source_package_available" />
+  </target>
+
+  <target name="pcduino-get-source" depends="pcduino-check-source" unless="pcduino_source_package_available">
+    <get
+      src="https://github.com/pcduino/c_environment/archive/master.zip"
+      dest="linux/dist/pcduino-arduino.zip"
+      verbose="true" />
+  </target>
+
+  <target name="pcduino-check-avalable">
+    <available file="linux/work/hardware/arduino/pcduino/cores/" property="pcduino_source_available" />
+  </target>
+
+  <target name="pcduino-unzip-source" depends="pcduino-get-source, pcduino-check-source" unless="pcduino_source_available">
+    <!-- Unzip pcduino source to the destination folder -->
+    <unzip dest="linux/dist/" src="linux/dist/pcduino-arduino.zip" overwrite="false"/>
+    <copy todir="linux/work/hardware/arduino/pcduino/cores/arduino/">
+      <fileset dir="linux/dist/c_environment-master/hardware/arduino/cores/arduino" includes="**" />
+      <fileset dir="linux/dist/c_environment-master/sample" includes="core.h" />
+    </copy>
+    <copy todir="linux/work/hardware/arduino/pcduino/variants/sunxi/">
+      <fileset dir="linux/dist/c_environment-master/hardware/arduino/variants/sunxi" includes="**" />
+    </copy>
+    <copy todir="linux/work/hardware/arduino/pcduino/libraries/">
+      <fileset dir="linux/dist/c_environment-master/libraries" includes="**" />
+    </copy>
+  </target>
+
+  <target name="pcduino-copy-examples">
+    <delete dir="shared/examples/pcDuino" />
+    <exec executable="/bin/bash">
+      <arg line="linux/work/hardware/arduino/pcduino/copy_examples.sh linux/dist/c_environment-master/sample/ shared/examples" />
+    </exec>
+        
+  </target>
+  
   <target name="linuxarm-run" depends="build,start"/>
 
   <target name="linux32-start">
@@ -903,6 +989,9 @@
   <target name="linux64-dist" depends="linux-dist"
 	  description="Build .tar.xz of linux x86_64 version" />
 
+  <target name="pcduino-dist" depends="pcduino-clean, pcduino-build, linux-dist"
+          description="Build .tar.gz of linux version" />
+	
   <target name="linuxarm-dist" depends="linux-dist"
 	  description="Build .tar.xz of linux armhf version" />
 
@@ -1183,7 +1272,7 @@
   <!-- - - - - - - - -->
 
   <target name="clean" description="Perform a spring cleaning"
-	  depends="linux-clean, windows-clean, macosx-clean, subprojects-clean">
+	  depends="pcduino-clean, linux-clean, windows-clean, macosx-clean, subprojects-clean">
   </target>
 
   <target name="avr-toolchain-bundle" unless="light_bundle">

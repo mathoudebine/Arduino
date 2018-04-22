@@ -62,7 +62,14 @@ public class I18n {
     }
     // there might be a null pointer exception ... most likely will never happen but the jvm gets mad
     Locale.setDefault(locale);
-    i18n = ResourceBundle.getBundle("processing.app.i18n.Resources", Locale.getDefault());
+    try {
+      i18n = ResourceBundle.getBundle("processing.app.i18n.Resources", Locale.getDefault());
+    }
+    catch ( MissingResourceException e) {
+      // add by liaods, bug fix for MissingResourceException
+      Locale.setDefault(new Locale(Locale.getDefault().toString().toLowerCase()));
+      i18n = ResourceBundle.getBundle("processing.app.i18n.Resources", Locale.getDefault());
+    }
     PROMPT_YES = tr("Yes");
     PROMPT_NO = tr("No");
     PROMPT_CANCEL = tr("Cancel");
